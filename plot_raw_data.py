@@ -12,8 +12,9 @@ import pandas as pd
 WINDOW_SIZE = 1
 
 
-# get the rollowing average of a pandas series
+# get the rolling average of a pandas series
 def get_rolling_avg(input_series, window_size):
+    # 滑动窗口
     windows = input_series.rolling(window_size)
 
     # Create a list of moving averages
