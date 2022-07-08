@@ -1,13 +1,12 @@
-# Name: Kathleen Nguyen, Robert Bao
-# Email ID: kn7wz, cb5th
-# Date: 2021-2-23
-# File: main.py
-# The signal analysis code for pedometer analysis
+import pandas as pd
+import numpy as np
+from scipy.fftpack import fft, ifft
+from scipy import signal
 
 import matplotlib.pyplot as plt
 from matplotlib.ticker import MaxNLocator
-import pandas as pd
-import numpy as np
+
+import os
 
 
 # The best way to get data from the phone sensor: put in the pants
@@ -41,6 +40,7 @@ thresholding function
 '''
 
 
+# 7.8
 def threshold_fn(x, threshold=7.8, stepH=10):  # threshold=0.0035 除1000的时候
     # 生成了一个长度为len(x)的0向量
     res = pd.Series(0 * len(x), index=x.index)
@@ -58,110 +58,198 @@ def threshold_fn(x, threshold=7.8, stepH=10):  # threshold=0.0035 除1000的时�
     return res
 
 
+'''
+画三轴加速度的图像
+plot three-axis acceleration data
+    data3D: DataFrame
+    ax:
+    
+    return:
+'''
+
+
+def plot_3axis_accel(data3D, ax=None):
+    # print('type(data3D)', type(data3D))
+    # print('list(data3D)', list(data3D))
+    # print('data3D', data3D)
+
+    x = data3D["accel_X"]
+    y = data3D["accel_Y"]
+    z = data3D["accel_Z"]
+
+    if not ax:
+        plt.figure()
+        ax = plt
+
+    line1, = ax.plot(x, label='x')
+    line2, = ax.plot(y, label='y')
+    line3, = ax.plot(z, label='z')
+
+    ax.grid()
+    ax.legend(handles=[line1, line2, line3])  # 每一个ax对象都有图例，否则subplot只显示一个
+
+
 # endregion
 
 # input file: imported accelerometer data -- without g
-# also try: walk-10-step-2022-2-24-v2.csv !
+# also try: walk-10-step-2022-2-24-v2.csv
 # Note: This will not work with data with g. (The value range is different)
 
-window_size = 100  # 窗就是帧的个数，根据步伐的频率决定
-dataType = 7
 sampling_interval = 40  # 每一帧采样之间间隔的时间，40ms
+# 窗就是帧的个数，根据步伐的频率决定
+window_size = 100  # 40 * 100ms = 4s
 
 # region 初始参数获取
 
 # 读取汇总文件
 # 从中获取所有的真实步数 todo
 
+# 读取路径下所有文件名
+path = "D:/Github/the-pedometer-algorithm/data"  # todo 按天修改文件路径
+datanames = os.listdir(path)
+# for i in datanames:
+#     print(i)
+
+
+# 我们的三轴原始的度数accel_Y为实际重力方向，且方向相反
 
 # 读取数据文件
-if dataType == 1:  # 自带数据
-    filename = "data/walk-10-step-2022-3-2-v1.csv"
-    df = pd.read_csv(filename)
-    time = df["Time (s)"]
-    acc = df["Linear Acceleration y (m/s^2)"]
 
-elif dataType == 2:  # 刘楷0步行
-    filename = "data/刘楷0步行左手食指指环7E_EE_2022_07_06_1014_3985_ACC.csv"
-    df = pd.read_csv(filename)
-    # df = pd.read_csv(filename, nrows=1000)
-    time = df["timestamp"]
-    # acc = df["accel_Y"]
+dataTime = 7_7  # 7_7; 7_6
+dataType = 1
 
-    accel_X = df["accel_X"]
-    accel_Y = df["accel_Y"]
-    accel_Z = df["accel_Z"]
-    acc = np.sqrt(accel_X ** 2 + accel_Y ** 2 + accel_Z ** 2)
-    real_step_num = 163  # 通过金标准获取的真实步数
+if dataTime == 7_7:
+    if dataType == 1:  # 刘楷步行
+        filename = "data/2022_07_07/1刘楷步行左手食指指环7E_EE_2022_07_07_1556_2113_ACC.csv"
+        df = pd.read_csv(filename)
+        time = df["timestamp"]
+        real_step_num = 86  # 通过金标准获取的真实步数
 
-elif dataType == 3:  # 刘楷0慢跑
-    filename = "data/刘楷0慢跑左手食指指环7E_EE_2022_07_06_1019_5089_ACC.csv"
-    df = pd.read_csv(filename)
-    time = df["timestamp"]
+    elif dataType == 2:  # 刘楷步行
+        filename = "data/2022_07_07/2刘楷步行左手食指指环7E_EE_2022_07_07_1614_1809_ACC.csv"
+        df = pd.read_csv(filename)
+        time = df["timestamp"]
 
-    accel_X = df["accel_X"]
-    accel_Y = df["accel_Y"]
-    accel_Z = df["accel_Z"]
-    acc = np.sqrt(accel_X ** 2 + accel_Y ** 2 + accel_Z ** 2)
-    real_step_num = 448  # 通过金标准获取的真实步数
+        real_step_num = 113  # 通过金标准获取的真实步数
 
-elif dataType == 4:  # 刘楷1慢跑
-    filename = "data/刘楷1慢跑右手食指指环7E_EE_2022_07_06_1101_4849_ACC.csv"
-    df = pd.read_csv(filename)
-    time = df["timestamp"]
+    elif dataType == 3:  # 刘楷步行
+        filename = "data/2022_07_07/3刘楷步行左手中指指环7E_EE_2022_07_07_1622_1745_ACC.csv"
+        df = pd.read_csv(filename)
+        time = df["timestamp"]
 
-    accel_X = df["accel_X"]
-    accel_Y = df["accel_Y"]
-    accel_Z = df["accel_Z"]
-    acc = np.sqrt(accel_X ** 2 + accel_Y ** 2 + accel_Z ** 2)
-    real_step_num = 504  # 通过金标准获取的真实步数
+        real_step_num = 115  # 通过金标准获取的真实步数
 
-elif dataType == 5:  # 刘伟杰1
-    filename = "data/刘伟杰1步行左手食指指环7E_EE_2022_07_06_1055_4497_ACC.csv"
-    df = pd.read_csv(filename)
-    time = df["timestamp"]
+    elif dataType == 4:  # 刘楷步行
+        filename = "data/2022_07_07/4刘楷步行左手中指指环7E_EE_2022_07_07_1625_1761_ACC.csv"
+        df = pd.read_csv(filename)
+        time = df["timestamp"]
 
-    accel_X = df["accel_X"]
-    accel_Y = df["accel_Y"]
-    accel_Z = df["accel_Z"]
-    acc = np.sqrt(accel_X ** 2 + accel_Y ** 2 + accel_Z ** 2)
-    real_step_num = 372  # 通过金标准获取的真实步数
+        real_step_num = 111  # 通过金标准获取的真实步数
 
-elif dataType == 6:  # 刘伟杰步行
-    filename = "data/刘伟杰步行左手食指指环7E_EE_2022_07_06_1040_4577_ACC.csv"
-    df = pd.read_csv(filename)
-    time = df["timestamp"]
+    elif dataType == 5:  # 刘楷步行
+        filename = "data/2022_07_07/5刘楷步行右手食指指环7E_EE_2022_07_07_1629_1825_ACC.csv"
+        df = pd.read_csv(filename)
+        time = df["timestamp"]
 
-    accel_X = df["accel_X"]
-    accel_Y = df["accel_Y"]
-    accel_Z = df["accel_Z"]
-    acc = np.sqrt(accel_X ** 2 + accel_Y ** 2 + accel_Z ** 2)
-    real_step_num = 180  # 通过金标准获取的真实步数
+        real_step_num = 99  # 通过金标准获取的真实步数
 
-elif dataType == 7:  # 张建宇步行
-    filename = "data/张建宇步行左手食指指环7E_EE_2022_07_06_1030_4497_ACC.csv"
-    df = pd.read_csv(filename, nrows=500)
-    time = df["timestamp"]
+    elif dataType == 6:  # 刘楷慢跑
+        filename = "data/2022_07_07/6刘楷慢跑右手食指指环7E_EE_2022_07_07_1635_1953_ACC.csv"
+        df = pd.read_csv(filename, nrows=500)
+        # df = pd.read_csv(filename)
+        time = df["timestamp"]
 
-    accel_X = df["accel_X"]
-    accel_Y = df["accel_Y"]
-    accel_Z = df["accel_Z"]
-    acc = np.sqrt(accel_X ** 2 + accel_Y ** 2 + accel_Z ** 2)
-    real_step_num = 285  # 通过金标准获取的真实步数
+        real_step_num = 147  # 通过金标准获取的真实步数
 
-else:
-    print("error")
+    else:
+        print("error")
 
-# endregion
+    # endregion
 
+elif dataTime == 7_6:
+    # region 加速度数据读取
+    if dataType == 1:  # 自带数据
+        filename = "data/walk-10-step-2022-3-2-v1.csv"
+        df = pd.read_csv(filename)
+        time = df["Time (s)"]
+        acc = df["Linear Acceleration y (m/s^2)"]
+
+    elif dataType == 2:  # 刘楷0步行
+        filename = "data/2022_07_06/刘楷0步行左手食指指环7E_EE_2022_07_06_1014_3985_ACC.csv"
+        df = pd.read_csv(filename)
+        # df = pd.read_csv(filename, nrows=1000)
+        time = df["timestamp"]
+        # acc = df["accel_Y"]
+
+        real_step_num = 163  # 通过金标准获取的真实步数
+
+    elif dataType == 3:  # 刘楷0慢跑
+        filename = "data/2022_07_06/刘楷0慢跑左手食指指环7E_EE_2022_07_06_1019_5089_ACC.csv"
+        df = pd.read_csv(filename)
+        time = df["timestamp"]
+
+        real_step_num = 448  # 通过金标准获取的真实步数
+
+    elif dataType == 4:  # 刘楷1慢跑
+        filename = "data/2022_07_06/刘楷1慢跑右手食指指环7E_EE_2022_07_06_1101_4849_ACC.csv"
+        df = pd.read_csv(filename)
+        time = df["timestamp"]
+
+        real_step_num = 504  # 通过金标准获取的真实步数
+
+    elif dataType == 5:  # 刘伟杰1
+        filename = "data/2022_07_06/刘伟杰1步行左手食指指环7E_EE_2022_07_06_1055_4497_ACC.csv"
+        df = pd.read_csv(filename)
+        time = df["timestamp"]
+
+        real_step_num = 372  # 通过金标准获取的真实步数
+
+    elif dataType == 6:  # 刘伟杰步行
+        filename = "data/2022_07_06/刘伟杰步行左手食指指环7E_EE_2022_07_06_1040_4577_ACC.csv"
+        df = pd.read_csv(filename)
+        time = df["timestamp"]
+
+        real_step_num = 180  # 通过金标准获取的真实步数
+
+    # endregion
+
+    elif dataType == 7:  # 张建宇步行
+        filename = "data/2022_07_06/张建宇步行左手食指指环7E_EE_2022_07_06_1030_4497_ACC.csv"
+        df = pd.read_csv(filename, nrows=500)
+        # df = pd.read_csv(filename)
+        time = df["timestamp"]
+
+        real_step_num = 285  # 通过金标准获取的真实步数
+
+        # raw_accel_X = df["accel_X"]  # Series
+        # raw_accel_Y = df["accel_Y"]
+        # raw_accel_Z = df["accel_Z"]
+        # Series合并成DataFrame
+        # acc_3D = pd.DataFrame(raw_accel_X, raw_accel_Y, raw_accel_Z)
+
+    else:
+        print("error")
+
+acc_3D = df[["accel_X", "accel_Y", "accel_Z"]]
+df["accel_total"] = df["accel_X"] ** 2 + df["accel_Y"] ** 2 + df["accel_Z"] ** 2
+# 计算加速度的平方根
+acc = df["accel_total"].apply(np.sqrt)
 
 # 测试模式 1进入，0退出
 testMode = 0
 
 # 滑动均值滤波
-avg_time = get_rolling_avg(time, window_size)
-avg_acc = get_rolling_avg(acc, window_size)
+filter_mode = 1  # 0: 无滤波; 1: 均值滤波,
 
+if filter_mode == 0:
+    avg_acc = acc
+    avg_time = time
+
+elif filter_mode == 1:
+    avg_time = get_rolling_avg(time, window_size)
+    avg_acc = get_rolling_avg(acc, window_size)
+
+# 时间数据长度
 if testMode == 1:
     print('len(time)', len(time))
     print('len(acc)', len(acc))
@@ -171,9 +259,48 @@ if testMode == 1:
 avg_time = pd.Series(avg_time)  # list转Series
 series_avg_acc = pd.Series(avg_acc)  # list转Series
 
+# plot_3axis_accel(series_avg_acc)
+# plt.title('滤波前原始加速度')
+
 # Time offset correction
 # avg_time = (avg_time - avg_time[0]) / sampling_interval
 avg_time = (avg_time - avg_time[0]) / 1000
+
+print('acc_3D: ', acc_3D.axes)
+acc_3D['accel_X'].plot()
+plt.title('原始x加速度')
+
+plot_3axis_accel(acc_3D)
+plt.title('滤波后加速度')
+
+Fs = 100  # 采样频率
+T = 1 / Fs  # 采样周期，只相邻两数据点的时间间隔
+L = len(avg_time)  # 信号长度
+
+# 计算信号的傅里叶变换
+Y = fft(acc.tolist())  # avg_acc为ndarray
+p2 = np.abs(Y)  # 双侧频谱
+p1 = p2[:int(L / 2)]
+
+# 定义频域f并绘制单侧幅值频谱P1。与预期相符，由于增加了噪声，幅值并不精确等于 0.7 和 1。
+f = np.arange(int(L / 2)) * Fs / L
+plt.figure()
+plt.plot(f, 2 * p1 / L)
+plt.xlim(-1, 2)  # 坐标轴范围
+plt.title('Single-Sided Amplitude Spectrum of X(t)')
+plt.xlabel('f (Hz)')
+plt.ylabel('|P1(f)|')
+
+
+# 峰值检测
+P1 = 2 * p1 / L
+plt.figure()
+peaks, _ = signal.find_peaks(P1, height=0)  # 返回找到峰值的值的索引
+print('P1[peaks]:', P1[peaks])
+
+plt.plot(peaks, P1[peaks])
+plt.title("峰值检测")
+
 
 # find out if the data trend is increasing
 # 找到递增数据的趋势
@@ -219,14 +346,14 @@ step += series_avg_acc.min()  # 阶跃图基础高度
 
 # difference from the previous row
 # 与前一帧作差，判断当前位置是递增还递减
-step_change = step - step.shift(1) # step_change[i]=step[i]-step[i-1]，变化值
+step_change = step - step.shift(1)  # step_change[i]=step[i]-step[i-1]，变化值
 # generate the final value count
-gradient_count = step_change.value_counts() # 统计不同斜率个数
+gradient_count = step_change.value_counts()  # 统计不同斜率个数
 
 if testMode == 1:
-    print('----list(step): ',list(step))
+    print('----list(step): ', list(step))
     print('----list(step_change):', list(step_change))
-    print('----gradient_count:',gradient_count)
+    print('----gradient_count:', gradient_count)
 
 # index表示增减性，获取递增趋势的位置
 positive_count = gradient_count[gradient_count.index > 0]
